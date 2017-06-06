@@ -8,14 +8,16 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.regex.Pattern;
 
 public class ChatHandler extends Thread {
 
 	public static int WAITING_LOGIN = 0;
 	public static int LOGGED = 1;
-
+	private final Pattern patternUsr = Pattern.compile("^[A-Za-z0-9]{4,10}$");
 	public static HashMap<String, ChatHandler> clients;
-
+	public static Logger log;
+	
 	private Socket s;
 	private DataInputStream i;
 	private DataOutputStream o;
@@ -29,15 +31,12 @@ public class ChatHandler extends Thread {
 	 * @throws IOException
 	 */
 	public ChatHandler(Socket s) throws IOException {
-		if(ChatHandler.clients == null){
-			ChatHandler.clients = new HashMap<>();
-		}
 		this.s = s;
 		this.i = new DataInputStream(new BufferedInputStream(this.s.getInputStream()));
 		this.o = new DataOutputStream(new BufferedOutputStream(this.s.getOutputStream()));
 		user = "";
 		handshake();
-		System.out.println("cliente conectado");
+		log.log_debug("Cliente conectado");
 	}
 
 	/**
@@ -49,7 +48,7 @@ public class ChatHandler extends Thread {
 		while (c) {
 			try {
 				Message msg = new Message(i.readUTF());
-				System.out.println("IN server: " + msg);
+				log.log_all("IN: " + msg);
 				msg.setSource(this.user);
 				process(msg);
 			} catch (IOException e) {
@@ -79,7 +78,15 @@ public class ChatHandler extends Thread {
 		} else {
 			m.setSource(this.user);
 			if (m.getType() == Message.USR_MSJ) {
-				broadcast(m);
+				try{
+					broadcast(m);
+				}catch (Exception e) {
+					m.setSource(m.getDestination());
+					m.setDestination(this.user);
+					m.setText("No se pudo entregar tu mensaje.");
+					m.setType(Message.STATUS_INFO);
+					broadcast(m);
+				}
 			} else {
 				// salida, o cualquier mensaje de status. Descartado por ahora
 			}
@@ -94,12 +101,34 @@ public class ChatHandler extends Thread {
 	 */
 	private void login(Message m) throws IOException {
 		this.user = m.getText();
+		Iterator<String> list = ChatHandler.clients.keySet().iterator();
+		if(this.user.toLowerCase().equals("all") || !patternUsr.matcher(this.user).matches()){
+			sendError("login","Nombre de usuario invalido. (4 a 10 caracteres, solo letras y numeros)");
+			return;
+		}
+		while (list.hasNext()) {
+			if(this.user.toUpperCase().equals(list.next().toUpperCase())){
+				this.user="";
+				sendError("login","Usuario ya existe.");
+				return;
+			}
+		}
 		ChatHandler.clients.put(this.user, this);
 		sendClientList();
-		System.out.println("logueado "+this.user);
+		log.userConnected(this.user);
+		log.log_debug("logueado "+this.user);
 		this.status = ChatHandler.LOGGED;
 	}
 
+	private void sendError(String group,String msg) throws IOException{
+		Message m = new Message();
+		m.setType(Message.SERVER_FATAL);
+		m.setDestination(group);
+		m.setSource("server");
+		m.setText(msg);
+		send(m);
+	}
+	
 	/**
 	 * Envia lista de clientes a cada uno de ellos
 	 * 
@@ -154,7 +183,7 @@ public class ChatHandler extends Thread {
 	 * @throws IOException
 	 */
 	private void send(Message m) throws IOException {
-		System.out.println("enviando:" +m.toString());
+		log.log_all("OUT:" +m.toString());
 		this.o.writeUTF(m.toString());
 		this.o.flush();
 	}
@@ -173,22 +202,37 @@ public class ChatHandler extends Thread {
 
 	}
 
+	public static void kick(String usr){
+		if(clients.containsKey(usr)){
+			ChatHandler ch = clients.get(usr);
+			try {
+				ch.sendError("login", "Fuiste desconectado por el server");
+			} catch (IOException e) {
+				log.log_all("No se pudo noficar usuario expulsado");
+			}
+			clients.remove(usr);
+			ch.kissoff();
+		}
+	}
+	
 	/**
 	 * Cierra conexion con cliente
 	 * @throws IOException 
 	 */
 	public void kissoff() {
-		System.out.println("Cliente desconectado "+this.user);
 		try {
 			this.s.close();
+			log.userDisConnected(this.user);
+			log.log_debug("Cliente desconectado "+this.user);
+			if (!this.user.equals("")) {
+				ChatHandler.clients.remove(this.user);
+			}
+			try{
+				sendClientList();
+			}catch(Exception e){}
 		} catch (IOException e) {
 
 		}
-		if (!this.user.equals("")) {
-			ChatHandler.clients.remove(this.user);
-		}
-		try{
-			sendClientList();
-		}catch(Exception e){}
+		
 	}
 }
