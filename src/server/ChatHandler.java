@@ -183,7 +183,7 @@ public class ChatHandler extends Thread {
 	 * @throws IOException
 	 */
 	private void send(Message m) throws IOException {
-		log.log_all("OUT:" +m.toString());
+		log.log_all("OUT ("+this.user+"):" +m.toString());
 		this.o.writeUTF(m.toString());
 		this.o.flush();
 	}
@@ -220,6 +220,8 @@ public class ChatHandler extends Thread {
 	 * @throws IOException 
 	 */
 	public void kissoff() {
+		if(!clients.containsKey(this.user))
+			return;
 		try {
 			this.s.close();
 			log.userDisConnected(this.user);

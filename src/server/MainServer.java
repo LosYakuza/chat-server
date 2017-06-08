@@ -7,7 +7,6 @@ import java.util.HashMap;
 
 public class MainServer extends Thread {
 
-	private HashMap<String, Thread> clients;	
 	private ServerSocket server;
 	private Logger log;
 
@@ -24,6 +23,11 @@ public class MainServer extends Thread {
 			server.close();
 		} catch (IOException e) {
 			log.log_all(e.getMessage());
+		}
+		String[] usrV = (String[]) ChatHandler.clients.keySet().toArray(
+				new String[ChatHandler.clients.keySet().size()]);
+		for(int i=0;i<usrV.length;i++){
+			ChatHandler.kick(usrV[i]);
 		}
 	}
 	
