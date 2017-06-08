@@ -85,12 +85,12 @@ public class ServerGUI implements Logger {
 		frmChatServer = new JFrame();
 		frmChatServer.setTitle("Chat Server");
 		frmChatServer.setResizable(false);
-		frmChatServer.setBounds(0, 0, 400, 500);
+		frmChatServer.setBounds(0, 0, 420, 550);
 		frmChatServer.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frmChatServer.getContentPane().setLayout(null);
 		
 		JScrollPane scrollPane = new JScrollPane();
-		scrollPane.setBounds(0, 0, 400, 400);
+		scrollPane.setBounds(0, 0, 420, 400);
 		frmChatServer.getContentPane().add(scrollPane);
 		
 		txtLog = new JTextArea();
